@@ -179,14 +179,13 @@ namespace MakeASurvey.Controllers
 
             
 
-            foreach (int a in responseInts)
-            {
+            foreach (Answer a in _context.Answers)            {
                 
-                Answer toUpdate = _context.Answers.FirstOrDefault(x => x.AnswerID == a);
-                int totalResponses = _context.Questions.FirstOrDefault(q => q.QuestionID == toUpdate.QuestionID).TotalResponses;
-                double ratio = (double)toUpdate.CountResponses / (double)totalResponses;
+                
+                int totalResponses = _context.Questions.FirstOrDefault(q => q.QuestionID == a.QuestionID).TotalResponses;
+                double ratio = (double)a.CountResponses / (double)totalResponses;
                 double percentage = 100 * Math.Round(ratio, 2);
-                toUpdate.Percentage = (int)percentage;
+                a.Percentage = (int)percentage;
 
             }
 
