@@ -62,7 +62,7 @@ namespace MakeASurvey
             app.UseRouting();
 
             app.UseCors(builder => builder
-                        .WithOrigins("http://localhost:3000", "http://localhost:4200", "https://lemon-tree-0f0786803.1.azurestaticapps.net/")
+                        .WithOrigins("http://localhost:3000", "http://localhost:4200", "https://lemon-tree-0f0786803.1.azurestaticapps.net")
                         .AllowAnyMethod()
                         .AllowCredentials()
                         .WithHeaders("*")
