@@ -163,33 +163,53 @@ namespace MakeASurvey.Controllers
 
             foreach (int a in responseInts)
             {
-                Answer toUpdate = _context.Answers.FirstOrDefault(x => x.AnswerID == a);
-                if (toUpdate != null) { toUpdate.CountResponses++; }
+                Answer toUpdate = _context.Answers.FirstOrDefault(x => x.AnswerID == a);                
                 allIDsOfQuestionsAnswered.Add(toUpdate.QuestionID);
             }
 
             List<int> questionsAnswered = allIDsOfQuestionsAnswered.Distinct().ToList();
-
-
+            
             foreach (int q in questionsAnswered)
             {
-                Question toUpdate = _context.Questions.FirstOrDefault(x => x.QuestionID == q);
+                Question toUpdate = _context.Questions.Include(x => x.Answers).FirstOrDefault(x => x.QuestionID == q);                    
+                   
                 toUpdate.TotalResponses++;
-            }
-
-            
-
-            foreach (Answer a in _context.Answers)            {
+                foreach(Answer a in toUpdate.Answers)
+                {
+                    if(responseInts.Contains(a.AnswerID))
+                    {
+                        a.CountResponses++;
+                    }
+                    int totalResponses = toUpdate.TotalResponses;
+                    double ratio = (double)a.CountResponses / (double)totalResponses;
+                    double percentage = 100 * Math.Round(ratio, 2);
+                    a.Percentage = (int)percentage;
+                }
                 
-                
-                int totalResponses = _context.Questions.FirstOrDefault(q => q.QuestionID == a.QuestionID).TotalResponses;
-                double ratio = (double)a.CountResponses / (double)totalResponses;
-                double percentage = 100 * Math.Round(ratio, 2);
-                a.Percentage = (int)percentage;
-
             }
-
             _context.SaveChanges();
+
+            //int currentSurveyId;
+            //if (questionsAnswered.Count > 0 )
+            //{
+            //    Question q = _context.Questions.FirstOrDefault(x => x.QuestionID == questionsAnswered[0]);
+            //    currentSurveyId = q.SurveyID;
+            //}
+                     
+
+            //foreach (Answer a in _context.Answers)           
+            //{   
+                                                
+            //    int totalResponses = _context.Questions.FirstOrDefault(q => q.QuestionID == a.QuestionID).TotalResponses;
+            //    double ratio = (double)a.CountResponses / (double)totalResponses;
+            //    double percentage = 100 * Math.Round(ratio, 2);
+            //    a.Percentage = (int)percentage;
+                
+
+            //}
+            //_context.SaveChanges();
+
+
         }
 
         // POST: api/Surveys
