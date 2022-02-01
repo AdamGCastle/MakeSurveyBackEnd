@@ -166,8 +166,12 @@ namespace MakeASurvey.Controllers
                 Answer toUpdate = _context.Answers.FirstOrDefault(x => x.AnswerID == a);                
                 allIDsOfQuestionsAnswered.Add(toUpdate.QuestionID);
             }
-
+            
             List<int> questionsAnswered = allIDsOfQuestionsAnswered.Distinct().ToList();
+            Question question = _context.Questions.FirstOrDefault(q => questionsAnswered.Contains(q.QuestionID));
+            Survey survey = _context.Surveys.FirstOrDefault(s => s.SurveyID == question.SurveyID);
+            survey.TotalResponses++;
+            _context.SaveChanges();
             
             foreach (int q in questionsAnswered)
             {
