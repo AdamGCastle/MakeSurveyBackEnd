@@ -20,7 +20,7 @@ namespace MakeASurvey.Models
         public int questionID { get; set; }
         public int surveyID { get; set; }
         public ReceiveAnswer[] answers { get; set; }
-        public bool IsMultipleChoice { get; set; }
+        public bool isMultipleChoice { get; set; }
         public int totalResponses { get; set; }
     }
 
