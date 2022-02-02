@@ -31,7 +31,7 @@ namespace MakeASurvey
             services.AddControllers();
 
             services.AddDbContext<MakeASurveyContext>(options =>
-                    options.UseSqlServer(Configuration.GetConnectionString("acbasic")));
+                    options.UseSqlServer(Configuration.GetConnectionString("MakeASurveyContext")));
 
             //Add Swagger relates setting  
             services.AddSwaggerGen(swagger =>

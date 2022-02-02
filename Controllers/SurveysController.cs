@@ -56,103 +56,144 @@ namespace MakeASurvey.Controllers
             return survey;        
 
             
-
-            
-            
         }
 
         // PUT: api/Surveys/5
         // To protect from overposting attacks, enable the specific properties you want to bind to, for
         // more details, see https://go.microsoft.com/fwlink/?linkid=2123754.
         [HttpPut("{id}")]
-        public async Task<IActionResult> PutSurvey(int id, Survey survey)
+        public async Task<IActionResult> PutSurvey(int id, ReceiveSurvey receiveSurvey)
         {
-            if (id != survey.SurveyID)
+
+            if (receiveSurvey.surveyID != id)
             {
                 return BadRequest();
             }
 
+            //UPDATE THE SURVEY OBJECT IN CASE ITS NAME HAS BEEN CHANGED
+            
+            Survey survey = new Survey
+            {
+                SurveyID = id,
+                Name = receiveSurvey.name,
+                TotalResponses = receiveSurvey.totalResponses,                
+            };
+                              
             _context.Entry(survey).State = EntityState.Modified;
 
-            foreach (var q in survey.Questions)
-            {   
-                if (_context.Questions.Any(x => x.QuestionID == q.QuestionID))
-                {
-                    _context.Entry(q).State = EntityState.Modified;
-                }
-                else
-                {
 
-                    Question NewQuestion = new Question { SurveyID = survey.SurveyID, Text = q.Text, TotalResponses = 0, IsMultipleChoice = q.IsMultipleChoice };
+            //GROUPS ALL QUESTIONS IN DB THAT BELONG TO THIS SURVEY
+            List<Question> surveyQs = _context.Questions.Where(q => q.SurveyID == id).ToList();
+
+            //ITERATES THROUGH THAT GROUP OF QUESTIONS IN DB
+            foreach (Question q in surveyQs)
+            {
+                //GROUPS ALL ANSWERS FROM DB THAT BELONG TO THIS QUESTION
+                List<Answer> QuestionsAs = _context.Answers.Where(a => a.QuestionID == q.QuestionID).ToList();
+
+                //REMOVES THE QUESTION AND THEIR ANSWERS FROM DB IF THEY BELONG TO THIS SURVEY BUT AREN'T IN THE NEWLY EDITED VERSION
+                if (!receiveSurvey.questions.Any(x => x.questionID == q.QuestionID))
+                {
+                    foreach (Answer a in QuestionsAs)
+                    {
+                        _context.Remove(a);
+                    }
+                    _context.Remove(q);
+                }
+
+                //REMOVES ANSWERS FROM DB IF THEY BELONG TO THE QUESTION BUT AREN'T IN THE NEWLY EDITED VERSION
+                ReceiveQuestion newlyEditedQuestion = receiveSurvey.questions.FirstOrDefault(x => x.questionID == q.QuestionID);
+
+                foreach (Answer a in QuestionsAs)
+                {
+                    if (!newlyEditedQuestion.answers.Any(x => x.answerID == a.AnswerID))
+                    {
+
+                        _context.Remove(a);
+                    }
+                }
+            }
+
+
+            await _context.SaveChangesAsync();
+
+
+
+            //ADD NEW QUESTIONS AND ANSWERS AND UPDATE EXISTING ONES
+
+            foreach (ReceiveQuestion receiveQuestion in receiveSurvey.questions)
+            {
+                Question NewQuestion = new Question
+                {
+                    Text = receiveQuestion.text,
+                    SurveyID = receiveSurvey.surveyID,                    
+                    IsMultipleChoice = receiveQuestion.isMultipleChoice,
+                    TotalResponses = receiveQuestion.totalResponses,
+                    QuestionID = receiveQuestion.questionID >= 0 ? receiveQuestion.questionID : 0
+                };                 
+                
+                if(NewQuestion.QuestionID == 0 )
+                {
                     _context.Questions.Add(NewQuestion);
                     //This savechanges() is important otherwise the questions aren't saved into the database
                     await _context.SaveChangesAsync();
-                    
-                }               
-
-            }
-
-            await _context.SaveChangesAsync();
-
-            foreach(Question q in survey.Questions)
-            {
-                foreach (Answer a in q.Answers)
-                {
-                    if (_context.Answers.Any(x => x.AnswerID == a.AnswerID))
+                    foreach(ReceiveAnswer a in receiveQuestion.answers)
                     {
-                        _context.Entry(a).State = EntityState.Modified;
-                    }
-                    else
-                    {
-                        Answer NewAnswer = new Answer { CountResponses = 0, Percentage = 0, Text = a.Text, QuestionID = q.QuestionID };
-                        _context.Answers.Add(a);
+                        Answer NewAnswer = new Answer { CountResponses = 0, Percentage = 0, Text = a.text, QuestionID = NewQuestion.QuestionID };
+                        _context.Answers.Add(NewAnswer);
                     }
                 }
-
-            }
-
-            await _context.SaveChangesAsync();
-
-
-
-            //Deletes questions and answers from database if they're associated with this survey but have been taken out in the updated version
-            foreach (Question q in _context.Questions)
-            {
-                if (q.SurveyID == id)
+                else if(_context.Questions.Any(x => x.QuestionID == NewQuestion.QuestionID))
                 {
-                    if(!survey.Questions.Any(x => x.QuestionID == q.QuestionID))
+                    if (!ModelState.IsValid)
                     {
-                        _context.Remove(q);
-                        break;
+                        return NoContent();
                     }
-                    foreach(Answer a in q.Answers)
+                    NewQuestion.Answers = _context.Answers.Where(a => a.QuestionID == NewQuestion.QuestionID);
+                    _context.Questions.Attach(NewQuestion);
+                    //_context.Attach(NewQuestion).State = EntityState.Modified;
+
+                    foreach (ReceiveAnswer a in receiveQuestion.answers)
                     {
-                        if(!q.Answers.Any(x => x.AnswerID == a.AnswerID))
+                        Answer NewAnswer = new Answer { CountResponses = a.countResponses, Percentage = a.percentage, Text = a.text, QuestionID = a.questionID };
+                        if(a.answerID == 0 )
                         {
-                            _context.Remove(a);
-                        } 
+                            _context.Answers.Add(NewAnswer);
+                        }
+                        else
+                        {
+                            _context.Attach(NewAnswer).State = EntityState.Modified;
+                        }
+                        
                     }
-                    
-                }  
+                }
             }
 
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!SurveyExists(id))
-                {
-                    return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
-            }
+            await _context.SaveChangesAsync();
+
+            
+
+
+
+            //try
+            //{
+            //    _context.SaveChanges();
+            //}
+            //catch (DbUpdateConcurrencyException)
+            //{
+            //    if (!SurveyExists(id))
+            //    {
+            //        return NotFound();
+            //    }
+            //    else
+            //    {
+            //        throw;
+            //    }
+            //}
 
             return NoContent();
+
+
         }
 
         [HttpPut]
@@ -193,27 +234,7 @@ namespace MakeASurvey.Controllers
             }
             _context.SaveChanges();
 
-            //int currentSurveyId;
-            //if (questionsAnswered.Count > 0 )
-            //{
-            //    Question q = _context.Questions.FirstOrDefault(x => x.QuestionID == questionsAnswered[0]);
-            //    currentSurveyId = q.SurveyID;
-            //}
-                     
-
-            //foreach (Answer a in _context.Answers)           
-            //{   
-                                                
-            //    int totalResponses = _context.Questions.FirstOrDefault(q => q.QuestionID == a.QuestionID).TotalResponses;
-            //    double ratio = (double)a.CountResponses / (double)totalResponses;
-            //    double percentage = 100 * Math.Round(ratio, 2);
-            //    a.Percentage = (int)percentage;
-                
-
-            //}
-            //_context.SaveChanges();
-
-
+          
         }
 
         // POST: api/Surveys
@@ -232,7 +253,7 @@ namespace MakeASurvey.Controllers
 
             foreach(ReceiveQuestion q in survey.questions)
             {
-                Question NewQuestion = new Question { SurveyID = SurveyID, Text = q.text, TotalResponses = 0, IsMultipleChoice = q.IsMultipleChoice };
+                Question NewQuestion = new Question { SurveyID = SurveyID, Text = q.text, TotalResponses = 0, IsMultipleChoice = q.isMultipleChoice };
                 _context.Questions.Add(NewQuestion);
                 //This savechanges() is important otherwise the questions aren't saved into the database
                 await _context.SaveChangesAsync();
@@ -279,8 +300,7 @@ namespace MakeASurvey.Controllers
                     }
                     _context.Remove(q);
                 }
-            }
-           
+            }        
 
 
             await _context.SaveChangesAsync();
@@ -294,3 +314,42 @@ namespace MakeASurvey.Controllers
         }
     }
 }
+
+// FROM PREVIOUS VERSION OF PUT SURVEY
+
+//foreach (Question q in survey.Questions)
+//{
+//    List<Answer> qAnswersFromDb = _context.Answers.Where(a => a.QuestionID == q.QuestionID).ToList();
+//    List<Answer> newAnswers = q.Answers.ToList();
+
+//    foreach (Answer a in qAnswersFromDb)
+//    {
+//        if (!newAnswers.Contains(a))
+//        {
+//            _context.Answers.Remove(a);
+//        }
+//    }
+
+//    if (q.Answers != null)
+//    {
+//        foreach (Answer a in q.Answers)
+//        {
+//            if (_context.Answers.Any(x => x.AnswerID == a.AnswerID))
+//            {
+//                _context.Entry(a).State = EntityState.Modified;
+//            }
+//            else
+//            {
+//                Answer NewAnswer = new Answer { CountResponses = 0, Percentage = 0, Text = a.Text, QuestionID = q.QuestionID };
+//                _context.Answers.Add(a);
+//            }
+//        }
+//    }
+
+
+
+//}
+
+
+//Deletes questions and answers from database if they're associated with this survey but have been taken out in the updated version
+
